@@ -1,0 +1,8 @@
+MSX_01  optimize                                 # MODSET: Apply 'optimize' modifier
+MSX_09  $AIEngine  process_data                  # INFER: AI inference call to process data
+MSX_07  auto                                    # PING: Automatic real-time error handling
+MSX_05  active                                  # FLOWCMP: Compress memory during active flow
+MSX_08  $GarbageCollector  dynamic_cleanup       # SIFT: Dynamic garbage collection
+MSX_06  high_load  $MemoryManager                # RELEASE: Release memory under high load
+MSX_0B                                           # PAUSE: Pause execution
+MSX_FF                                           # END: End script

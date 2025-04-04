@@ -873,3 +873,596 @@ root = tk.Tk()
 app = ModuSynthX_App(root)
 root.mainloop()
 
+import zipfile
+import os
+
+# Define the complete code as a string
+full_code = """
+# ModuSynthX Full Application - Python + Tkinter
+
+import tkinter as tk
+from tkinter import messagebox
+import threading
+import time
+
+# Define Instruction Set and Modifiers
+INSTRUCTION_SET = {
+    'OPTIMIZE': 0x01,
+    'INFER': 0x09,
+    'PING': 0x07,
+    'FLOWCMP': 0x05,
+    'SIFT': 0x08,
+    'RELEASE': 0x06,
+    'PAUSE': 0x0B,
+    'END': 0xFF,
+    'WRITE': 0x10,
+    'READ': 0x11
+}
+
+MODIFIER_SET = {
+    'quick': 'OPTIMIZE',
+    'auto': 'PING',
+    'active': 'FLOWCMP',
+    'soft': 'SIFT',
+    'high_load': 'RELEASE'
+}
+
+# Virtual Register Memory Allocation (VRMA)
+class VRMA:
+    def __init__(self):
+        self.registers = {}
+        self.counter = 0
+
+    def alloc(self, name):
+        if name not in self.registers:
+            self.registers[name] = {"value": None, "id": self.counter}
+            self.counter += 1
+
+    def write(self, name, value):
+        self.alloc(name)
+        self.registers[name]['value'] = value
+
+    def read(self, name):
+        return self.registers[name]['value'] if name in self.registers else None
+
+    def free_unused(self):
+        to_delete = [k for k, v in self.registers.items() if v['value'] is None]
+        for k in to_delete:
+            del self.registers[k]
+
+# Bytecode Compiler from C.L.V. Grammar
+def clv_compile(lines):
+    bytecode = []
+    for line in lines:
+        if not line.strip():
+            continue
+        parts = line.strip().split()
+        if len(parts) < 2:
+            continue
+        mod = parts[0]
+        cmd = parts[1]
+        args = parts[2:]
+
+        instr_name = MODIFIER_SET.get(mod, cmd).upper()
+        opcode = INSTRUCTION_SET.get(instr_name, None)
+        if opcode is not None:
+            bytecode.append((opcode, args))
+    return bytecode
+
+# Core VM for Execution
+class ModuSynthX_VM:
+    def __init__(self):
+        self.vrma = VRMA()
+        self.stack = []
+        self.running = False
+        self.lock = threading.Lock()
+
+    def execute(self, bytecode):
+        self.running = True
+        pc = 0
+        while pc < len(bytecode) and self.running:
+            with self.lock:
+                opcode, args = bytecode[pc]
+
+                if opcode == INSTRUCTION_SET['OPTIMIZE']:
+                    self.stack = list(dict.fromkeys(self.stack))
+                elif opcode == INSTRUCTION_SET['PING']:
+                    if not args or 'fail' in args:
+                        continue
+                elif opcode == INSTRUCTION_SET['FLOWCMP']:
+                    self.stack = self.stack[-256:]
+                elif opcode == INSTRUCTION_SET['SIFT']:
+                    self.vrma.free_unused()
+                elif opcode == INSTRUCTION_SET['RELEASE']:
+                    self.stack.clear()
+                elif opcode == INSTRUCTION_SET['WRITE']:
+                    if len(args) >= 2:
+                        self.vrma.write(args[0], " ".join(args[1:]))
+                elif opcode == INSTRUCTION_SET['READ']:
+                    if args:
+                        val = self.vrma.read(args[0])
+                        self.stack.append(val)
+                elif opcode == INSTRUCTION_SET['PAUSE']:
+                    time.sleep(0.25)
+                elif opcode == INSTRUCTION_SET['END']:
+                    self.running = False
+            pc += 1
+
+    def stop(self):
+        with self.lock:
+            self.running = False
+
+# GUI App with Tkinter Drag-and-Drop Editor
+class ModuSynthX_App:
+    def __init__(self, master):
+        self.master = master
+        self.master.title("ModuSynthX Visual Compiler")
+        self.vm = ModuSynthX_VM()
+        self.grid_size = 8
+        self.cells = {}
+        self.build_interface()
+
+    def build_interface(self):
+        self.canvas = tk.Canvas(self.master, width=800, height=600, bg='black')
+        self.canvas.pack()
+
+        self.grid_frame = tk.Frame(self.canvas, bg='white')
+        self.grid_frame.place(x=50, y=50)
+
+        for y in range(self.grid_size):
+            for x in range(self.grid_size):
+                e = tk.Entry(self.grid_frame, width=20, bg='black', fg='lime', insertbackground='lime')
+                e.grid(row=y, column=x, padx=2, pady=2)
+                self.cells[(x, y)] = e
+
+        self.run_button = tk.Button(self.master, text="Compile & Run", command=self.run_script, bg='purple', fg='white')
+        self.run_button.place(x=50, y=20)
+
+        self.stop_button = tk.Button(self.master, text="Stop", command=self.vm.stop, bg='red', fg='white')
+        self.stop_button.place(x=200, y=20)
+
+    def get_script_from_grid(self):
+        script = []
+        for y in range(self.grid_size):
+            row = []
+            for x in range(self.grid_size):
+                val = self.cells[(x, y)].get().strip()
+                if val:
+                    row.append(val)
+            if row:
+                script.append(" ".join(row))
+        return script
+
+    def run_script(self):
+        script = self.get_script_from_grid()
+        bytecode = clv_compile(script)
+        t = threading.Thread(target=self.vm.execute, args=(bytecode,))
+        t.start()
+
+# Initialize Application
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = ModuSynthX_App(root)
+    root.mainloop()
+"""
+
+# Save the code to a file
+os.makedirs("/mnt/data/modusynthx", exist_ok=True)
+file_path = "/mnt/data/modusynthx/modusynthx_app.py"
+with open(file_path, "w") as f:
+    f.write(full_code)
+
+# Create a zip archive of the folder
+zip_path = "/mnt/data/modusynthx_app.zip"
+with zipfile.ZipFile(zip_path, 'w') as zipf:
+    zipf.write(file_path, arcname="modusynthx_app.py")
+
+zip_path
+
+import zipfile
+import os
+
+# Define the complete code as a string
+full_code = """
+# ModuSynthX Full Application - Python + Tkinter
+
+import tkinter as tk
+from tkinter import messagebox
+import threading
+import time
+
+# Define Instruction Set and Modifiers
+INSTRUCTION_SET = {
+    'OPTIMIZE': 0x01,
+    'INFER': 0x09,
+    'PING': 0x07,
+    'FLOWCMP': 0x05,
+    'SIFT': 0x08,
+    'RELEASE': 0x06,
+    'PAUSE': 0x0B,
+    'END': 0xFF,
+    'WRITE': 0x10,
+    'READ': 0x11
+}
+
+MODIFIER_SET = {
+    'quick': 'OPTIMIZE',
+    'auto': 'PING',
+    'active': 'FLOWCMP',
+    'soft': 'SIFT',
+    'high_load': 'RELEASE'
+}
+
+# Virtual Register Memory Allocation (VRMA)
+class VRMA:
+    def __init__(self):
+        self.registers = {}
+        self.counter = 0
+
+    def alloc(self, name):
+        if name not in self.registers:
+            self.registers[name] = {"value": None, "id": self.counter}
+            self.counter += 1
+
+    def write(self, name, value):
+        self.alloc(name)
+        self.registers[name]['value'] = value
+
+    def read(self, name):
+        return self.registers[name]['value'] if name in self.registers else None
+
+    def free_unused(self):
+        to_delete = [k for k, v in self.registers.items() if v['value'] is None]
+        for k in to_delete:
+            del self.registers[k]
+
+# Bytecode Compiler from C.L.V. Grammar
+def clv_compile(lines):
+    bytecode = []
+    for line in lines:
+        if not line.strip():
+            continue
+        parts = line.strip().split()
+        if len(parts) < 2:
+            continue
+        mod = parts[0]
+        cmd = parts[1]
+        args = parts[2:]
+
+        instr_name = MODIFIER_SET.get(mod, cmd).upper()
+        opcode = INSTRUCTION_SET.get(instr_name, None)
+        if opcode is not None:
+            bytecode.append((opcode, args))
+    return bytecode
+
+# Core VM for Execution
+class ModuSynthX_VM:
+    def __init__(self):
+        self.vrma = VRMA()
+        self.stack = []
+        self.running = False
+        self.lock = threading.Lock()
+
+    def execute(self, bytecode):
+        self.running = True
+        pc = 0
+        while pc < len(bytecode) and self.running:
+            with self.lock:
+                opcode, args = bytecode[pc]
+
+                if opcode == INSTRUCTION_SET['OPTIMIZE']:
+                    self.stack = list(dict.fromkeys(self.stack))
+                elif opcode == INSTRUCTION_SET['PING']:
+                    if not args or 'fail' in args:
+                        continue
+                elif opcode == INSTRUCTION_SET['FLOWCMP']:
+                    self.stack = self.stack[-256:]
+                elif opcode == INSTRUCTION_SET['SIFT']:
+                    self.vrma.free_unused()
+                elif opcode == INSTRUCTION_SET['RELEASE']:
+                    self.stack.clear()
+                elif opcode == INSTRUCTION_SET['WRITE']:
+                    if len(args) >= 2:
+                        self.vrma.write(args[0], " ".join(args[1:]))
+                elif opcode == INSTRUCTION_SET['READ']:
+                    if args:
+                        val = self.vrma.read(args[0])
+                        self.stack.append(val)
+                elif opcode == INSTRUCTION_SET['PAUSE']:
+                    time.sleep(0.25)
+                elif opcode == INSTRUCTION_SET['END']:
+                    self.running = False
+            pc += 1
+
+    def stop(self):
+        with self.lock:
+            self.running = False
+
+# GUI App with Tkinter Drag-and-Drop Editor
+class ModuSynthX_App:
+    def __init__(self, master):
+        self.master = master
+        self.master.title("ModuSynthX Visual Compiler")
+        self.vm = ModuSynthX_VM()
+        self.grid_size = 8
+        self.cells = {}
+        self.build_interface()
+
+    def build_interface(self):
+        self.canvas = tk.Canvas(self.master, width=800, height=600, bg='black')
+        self.canvas.pack()
+
+        self.grid_frame = tk.Frame(self.canvas, bg='white')
+        self.grid_frame.place(x=50, y=50)
+
+        for y in range(self.grid_size):
+            for x in range(self.grid_size):
+                e = tk.Entry(self.grid_frame, width=20, bg='black', fg='lime', insertbackground='lime')
+                e.grid(row=y, column=x, padx=2, pady=2)
+                self.cells[(x, y)] = e
+
+        self.run_button = tk.Button(self.master, text="Compile & Run", command=self.run_script, bg='purple', fg='white')
+        self.run_button.place(x=50, y=20)
+
+        self.stop_button = tk.Button(self.master, text="Stop", command=self.vm.stop, bg='red', fg='white')
+        self.stop_button.place(x=200, y=20)
+
+    def get_script_from_grid(self):
+        script = []
+        for y in range(self.grid_size):
+            row = []
+            for x in range(self.grid_size):
+                val = self.cells[(x, y)].get().strip()
+                if val:
+                    row.append(val)
+            if row:
+                script.append(" ".join(row))
+        return script
+
+    def run_script(self):
+        script = self.get_script_from_grid()
+        bytecode = clv_compile(script)
+        t = threading.Thread(target=self.vm.execute, args=(bytecode,))
+        t.start()
+
+# Initialize Application
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = ModuSynthX_App(root)
+    root.mainloop()
+"""
+
+# Save the code to a file
+os.makedirs("/mnt/data/modusynthx", exist_ok=True)
+file_path = "/mnt/data/modusynthx/modusynthx_app.py"
+with open(file_path, "w") as f:
+    f.write(full_code)
+
+# Create a zip archive of the folder
+zip_path = "/mnt/data/modusynthx_app.zip"
+with zipfile.ZipFile(zip_path, 'w') as zipf:
+    zipf.write(file_path, arcname="modusynthx_app.py")
+
+zip_path
+
+# Prepare a complete project structure with directory layout
+project_root = "/mnt/data/ModuSynthX_Complete"
+os.makedirs(project_root, exist_ok=True)
+
+# 1. Main application script (GUI + VM + Compiler)
+main_app_code = """
+# File: main.py
+import tkinter as tk
+from gui import ModuSynthX_App
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = ModuSynthX_App(root)
+    root.mainloop()
+"""
+
+# 2. GUI module with Tkinter interface
+gui_code = """
+# File: gui.py
+import tkinter as tk
+from vm import ModuSynthX_VM
+from compiler import clv_compile
+import threading
+
+class ModuSynthX_App:
+    def __init__(self, master):
+        self.master = master
+        self.master.title("ModuSynthX Visual Compiler")
+        self.vm = ModuSynthX_VM()
+        self.grid_size = 8
+        self.cells = {}
+        self.build_interface()
+
+    def build_interface(self):
+        self.canvas = tk.Canvas(self.master, width=800, height=600, bg='black')
+        self.canvas.pack()
+
+        self.grid_frame = tk.Frame(self.canvas, bg='white')
+        self.grid_frame.place(x=50, y=50)
+
+        for y in range(self.grid_size):
+            for x in range(self.grid_size):
+                e = tk.Entry(self.grid_frame, width=20, bg='black', fg='lime', insertbackground='lime')
+                e.grid(row=y, column=x, padx=2, pady=2)
+                self.cells[(x, y)] = e
+
+        self.run_button = tk.Button(self.master, text="Compile & Run", command=self.run_script, bg='purple', fg='white')
+        self.run_button.place(x=50, y=20)
+
+        self.stop_button = tk.Button(self.master, text="Stop", command=self.vm.stop, bg='red', fg='white')
+        self.stop_button.place(x=200, y=20)
+
+    def get_script_from_grid(self):
+        script = []
+        for y in range(self.grid_size):
+            row = []
+            for x in range(self.grid_size):
+                val = self.cells[(x, y)].get().strip()
+                if val:
+                    row.append(val)
+            if row:
+                script.append(" ".join(row))
+        return script
+
+    def run_script(self):
+        script = self.get_script_from_grid()
+        bytecode = clv_compile(script)
+        t = threading.Thread(target=self.vm.execute, args=(bytecode,))
+        t.start()
+"""
+
+# 3. Compiler module for CLV -> Bytecode
+compiler_code = """
+# File: compiler.py
+INSTRUCTION_SET = {
+    'OPTIMIZE': 0x01,
+    'INFER': 0x09,
+    'PING': 0x07,
+    'FLOWCMP': 0x05,
+    'SIFT': 0x08,
+    'RELEASE': 0x06,
+    'PAUSE': 0x0B,
+    'END': 0xFF,
+    'WRITE': 0x10,
+    'READ': 0x11
+}
+
+MODIFIER_SET = {
+    'quick': 'OPTIMIZE',
+    'auto': 'PING',
+    'active': 'FLOWCMP',
+    'soft': 'SIFT',
+    'high_load': 'RELEASE'
+}
+
+def clv_compile(lines):
+    bytecode = []
+    for line in lines:
+        if not line.strip():
+            continue
+        parts = line.strip().split()
+        if len(parts) < 2:
+            continue
+        mod = parts[0]
+        cmd = parts[1]
+        args = parts[2:]
+
+        instr_name = MODIFIER_SET.get(mod, cmd).upper()
+        opcode = INSTRUCTION_SET.get(instr_name, None)
+        if opcode is not None:
+            bytecode.append((opcode, args))
+    return bytecode
+"""
+
+# 4. VM module for execution
+vm_code = """
+# File: vm.py
+import time
+import threading
+
+INSTRUCTION_SET = {
+    'OPTIMIZE': 0x01,
+    'INFER': 0x09,
+    'PING': 0x07,
+    'FLOWCMP': 0x05,
+    'SIFT': 0x08,
+    'RELEASE': 0x06,
+    'PAUSE': 0x0B,
+    'END': 0xFF,
+    'WRITE': 0x10,
+    'READ': 0x11
+}
+
+class VRMA:
+    def __init__(self):
+        self.registers = {}
+        self.counter = 0
+
+    def alloc(self, name):
+        if name not in self.registers:
+            self.registers[name] = {"value": None, "id": self.counter}
+            self.counter += 1
+
+    def write(self, name, value):
+        self.alloc(name)
+        self.registers[name]['value'] = value
+
+    def read(self, name):
+        return self.registers[name]['value'] if name in self.registers else None
+
+    def free_unused(self):
+        to_delete = [k for k, v in self.registers.items() if v['value'] is None]
+        for k in to_delete:
+            del self.registers[k]
+
+class ModuSynthX_VM:
+    def __init__(self):
+        self.vrma = VRMA()
+        self.stack = []
+        self.running = False
+        self.lock = threading.Lock()
+
+    def execute(self, bytecode):
+        self.running = True
+        pc = 0
+        while pc < len(bytecode) and self.running:
+            with self.lock:
+                opcode, args = bytecode[pc]
+                if opcode == INSTRUCTION_SET['OPTIMIZE']:
+                    self.stack = list(dict.fromkeys(self.stack))
+                elif opcode == INSTRUCTION_SET['PING']:
+                    if not args or 'fail' in args:
+                        continue
+                elif opcode == INSTRUCTION_SET['FLOWCMP']:
+                    self.stack = self.stack[-256:]
+                elif opcode == INSTRUCTION_SET['SIFT']:
+                    self.vrma.free_unused()
+                elif opcode == INSTRUCTION_SET['RELEASE']:
+                    self.stack.clear()
+                elif opcode == INSTRUCTION_SET['WRITE']:
+                    if len(args) >= 2:
+                        self.vrma.write(args[0], " ".join(args[1:]))
+                elif opcode == INSTRUCTION_SET['READ']:
+                    if args:
+                        val = self.vrma.read(args[0])
+                        self.stack.append(val)
+                elif opcode == INSTRUCTION_SET['PAUSE']:
+                    time.sleep(0.25)
+                elif opcode == INSTRUCTION_SET['END']:
+                    self.running = False
+            pc += 1
+
+    def stop(self):
+        with self.lock:
+            self.running = False
+"""
+
+# Save files
+with open(os.path.join(project_root, "main.py"), "w") as f:
+    f.write(main_app_code.strip())
+
+with open(os.path.join(project_root, "gui.py"), "w") as f:
+    f.write(gui_code.strip())
+
+with open(os.path.join(project_root, "compiler.py"), "w") as f:
+    f.write(compiler_code.strip())
+
+with open(os.path.join(project_root, "vm.py"), "w") as f:
+    f.write(vm_code.strip())
+
+# Zip the full project
+project_zip_path = "/mnt/data/ModuSynthX_Full_Project.zip"
+with zipfile.ZipFile(project_zip_path, 'w') as zipf:
+    for root, dirs, files in os.walk(project_root):
+        for file in files:
+            filepath = os.path.join(root, file)
+            arcname = os.path.relpath(filepath, project_root)
+            zipf.write(filepath, arcname=arcname)
+
+project_zip_path
+

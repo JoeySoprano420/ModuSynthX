@@ -1924,3 +1924,198 @@ with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
 
 zip_path
 
+import os
+import zipfile
+
+# Define update directory
+project_dir = "/mnt/data/ModuSynthX_Advanced"
+os.makedirs(project_dir, exist_ok=True)
+
+# --- Update main.py ---
+main_py = """
+from gui.advanced_editor import launch_advanced_editor
+
+if __name__ == '__main__':
+    launch_advanced_editor()
+"""
+
+# --- gui/advanced_editor.py ---
+advanced_editor_py = """
+import tkinter as tk
+from tkinter import messagebox
+from compiler.advanced_compiler import compile_script
+from vm.advanced_vm import AdvancedVM
+
+def launch_advanced_editor():
+    root = tk.Tk()
+    root.title("ModuSynthX Advanced Editor")
+    root.geometry("1000x700")
+
+    text_area = tk.Text(root, font=("Courier", 12), wrap="none")
+    text_area.pack(expand=True, fill="both")
+
+    def run_code():
+        script = text_area.get("1.0", tk.END).strip().split("\\n")
+        try:
+            bytecode = compile_script(script)
+            vm = AdvancedVM()
+            vm.execute(bytecode)
+            messagebox.showinfo("Execution", "Code executed successfully.")
+        except Exception as e:
+            messagebox.showerror("Error", f"Execution failed: {str(e)}")
+
+    run_button = tk.Button(root, text="Compile & Run", command=run_code)
+    run_button.pack(side="bottom")
+
+    root.mainloop()
+"""
+
+# --- compiler/advanced_compiler.py ---
+advanced_compiler_py = """
+instruction_set = {
+    'FUNC': 0x30,
+    'CALL': 0x31,
+    'RET': 0x32,
+    'MACRO': 0x33,
+    'DEFINE': 0x34,
+    'THREAD': 0x40,
+    'TYPE': 0x35,
+    'END': 0xFF,
+    'ADD': 0x12,
+    'SUB': 0x13,
+    'PRINT': 0x1A,
+}
+
+functions = {}
+macros = {}
+
+def compile_script(lines):
+    bytecode = []
+    pc = 0
+    in_func = False
+    func_name = ""
+
+    for line in lines:
+        parts = line.strip().split()
+        if not parts:
+            continue
+        if parts[0].upper() == 'FUNC':
+            in_func = True
+            func_name = parts[1]
+            functions[func_name] = pc
+            continue
+        elif parts[0].upper() == 'ENDFUNC':
+            in_func = False
+            continue
+        elif parts[0].upper() == 'MACRO':
+            macros[parts[1]] = parts[2:]
+            continue
+
+        opcode = instruction_set.get(parts[0].upper(), None)
+        if opcode is not None:
+            args = parts[1:]
+            if parts[0].upper() == 'CALL':
+                args = [functions.get(parts[1], 0)]
+            bytecode.append((opcode, args))
+            pc += 1
+
+    return bytecode
+"""
+
+# --- vm/advanced_vm.py ---
+advanced_vm_py = """
+import threading
+
+class MemoryPage:
+    def __init__(self):
+        self.data = [0] * 256
+        self.used = [False] * 256
+
+    def allocate(self, value):
+        for i in range(256):
+            if not self.used[i]:
+                self.used[i] = True
+                self.data[i] = value
+                return i
+        raise MemoryError("Page Full")
+
+    def free(self, index):
+        self.used[index] = False
+        self.data[index] = 0
+
+class MemoryManager:
+    def __init__(self):
+        self.pages = [MemoryPage()]
+
+    def allocate(self, value):
+        for page in self.pages:
+            try:
+                return page.allocate(value)
+            except MemoryError:
+                continue
+        new_page = MemoryPage()
+        self.pages.append(new_page)
+        return new_page.allocate(value)
+
+class AdvancedVM:
+    def __init__(self):
+        self.stack = []
+        self.running = True
+        self.memory = MemoryManager()
+
+    def execute(self, bytecode):
+        pc = 0
+        while pc < len(bytecode) and self.running:
+            opcode, args = bytecode[pc]
+            if opcode == 0x12:
+                b = self.stack.pop()
+                a = self.stack.pop()
+                self.stack.append(a + b)
+            elif opcode == 0x13:
+                b = self.stack.pop()
+                a = self.stack.pop()
+                self.stack.append(a - b)
+            elif opcode == 0x1A:
+                val = self.stack.pop()
+                print(val)
+            elif opcode == 0x30:
+                pass  # function entry handled by compiler
+            elif opcode == 0x31:
+                pc = args[0] - 1
+            elif opcode == 0x32:
+                return
+            elif opcode == 0x40:
+                thread = threading.Thread(target=self.execute, args=(args[0],))
+                thread.start()
+            elif opcode == 0xFF:
+                break
+            pc += 1
+"""
+
+# Save all files
+with open(os.path.join(project_dir, "main.py"), "w") as f:
+    f.write(main_py)
+
+os.makedirs(os.path.join(project_dir, "gui"), exist_ok=True)
+with open(os.path.join(project_dir, "gui", "advanced_editor.py"), "w") as f:
+    f.write(advanced_editor_py)
+
+os.makedirs(os.path.join(project_dir, "compiler"), exist_ok=True)
+with open(os.path.join(project_dir, "compiler", "advanced_compiler.py"), "w") as f:
+    f.write(advanced_compiler_py)
+
+os.makedirs(os.path.join(project_dir, "vm"), exist_ok=True)
+with open(os.path.join(project_dir, "vm", "advanced_vm.py"), "w") as f:
+    f.write(advanced_vm_py)
+
+# Zip for download
+zip_path = f"{project_dir}.zip"
+with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+    for folder, _, files in os.walk(project_dir):
+        for file in files:
+            full_path = os.path.join(folder, file)
+            rel_path = os.path.relpath(full_path, project_dir)
+            zipf.write(full_path, arcname=rel_path)
+
+zip_path
+

@@ -1,0 +1,2 @@
+write.quick.on @console "Hello, ModuSynthX World!"
+pause.briefly.after (ms: 500)

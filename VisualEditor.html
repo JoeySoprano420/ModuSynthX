@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>ModuSynthX Visual Editor</title>
+    <style>
+        body {
+            font-family: 'Orbitron', sans-serif;
+            background-color: #1a1a2e;
+            color: #dcdcdc;
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+            color: #f72585;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            background: #2d2d44;
+        }
+        th, td {
+            border: 1px solid #555;
+            padding: 10px;
+            text-align: center;
+        }
+        th {
+            background-color: #3a0ca3;
+            color: #fff;
+        }
+        td:focus {
+            outline: 2px solid #f72585;
+            background: #3f3f5e;
+        }
+        .add-row {
+            margin-top: 10px;
+            padding: 10px 20px;
+            background: #7209b7;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        .add-row:hover {
+            background: #560bad;
+        }
+    </style>
+</head>
+<body>
+    <h1>ModuSynthX Visual Editor (VACU Mode)</h1>
+    <table id="editorTable">
+        <thead>
+            <tr>
+                <th>Modifier</th>
+                <th>Command</th>
+                <th>Scope</th>
+                <th>Target</th>
+                <th>Value/Data</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr contenteditable="true">
+                <td>quick</td>
+                <td>write</td>
+                <td>on</td>
+                <td>@console</td>
+                <td>'Hello VACU'</td>
+            </tr>
+        </tbody>
+    </table>
+    <button class="add-row" onclick="addRow()">Add Row</button>
+
+    <script>
+        function addRow() {
+            const table = document.getElementById("editorTable").getElementsByTagName('tbody')[0];
+            const newRow = table.insertRow();
+            for (let i = 0; i < 5; i++) {
+                const newCell = newRow.insertCell(i);
+                newCell.contentEditable = "true";
+                newCell.innerText = "";
+            }
+        }
+    </script>
+</body>
+</html>

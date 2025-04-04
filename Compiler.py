@@ -1729,3 +1729,198 @@ class AdvancedVM:
                 self.pages.append({})
             elif opcode == advanced_instruction_set['SWITCH']:
                 self.page_index = int(args[0]) if args
+
+import os
+import zipfile
+
+# Create project structure for GUI-based ModuSynthX with full compiler, VM, and CLV grammar
+project_dir = "/mnt/data/ModuSynthX_GUI_Full"
+os.makedirs(project_dir, exist_ok=True)
+
+# --- main.py ---
+main_py = f"""
+from gui.editor import launch_editor
+
+if __name__ == '__main__':
+    launch_editor()
+"""
+
+# --- gui/editor.py ---
+editor_py = """
+import tkinter as tk
+from tkinter import messagebox
+from compiler.compiler import compile_script
+from vm.full_vm import FullVM
+
+def launch_editor():
+    root = tk.Tk()
+    root.title("ModuSynthX GUI Editor")
+    root.geometry("800x600")
+
+    text_area = tk.Text(root, font=("Courier", 12), wrap="none")
+    text_area.pack(expand=True, fill="both")
+
+    def run_code():
+        script = text_area.get("1.0", tk.END).strip().split("\\n")
+        try:
+            bytecode = compile_script(script)
+            vm = FullVM()
+            vm.execute(bytecode)
+            messagebox.showinfo("Execution", "Code executed successfully.")
+        except Exception as e:
+            messagebox.showerror("Error", f"Execution failed: {str(e)}")
+
+    run_button = tk.Button(root, text="Compile & Run", command=run_code)
+    run_button.pack(side="bottom")
+
+    root.mainloop()
+"""
+
+# --- compiler/compiler.py ---
+compiler_py = """
+extended_instruction_set = {
+    'OPTIMIZE': 0x01,
+    'INFER': 0x09,
+    'PING': 0x07,
+    'FLOWCMP': 0x05,
+    'SIFT': 0x08,
+    'RELEASE': 0x06,
+    'PAUSE': 0x0B,
+    'END': 0xFF,
+    'WRITE': 0x10,
+    'READ': 0x11,
+    'ADD': 0x12,
+    'SUB': 0x13,
+    'MUL': 0x14,
+    'DIV': 0x15,
+    'MOD': 0x16,
+    'JUMP': 0x17,
+    'JZ': 0x18,
+    'JNZ': 0x19,
+    'PRINT': 0x1A,
+    'LABEL': 0x1B
+}
+
+def compile_script(lines):
+    labels = {}
+    bytecode = []
+    pc = 0
+
+    for line in lines:
+        parts = line.strip().split()
+        if not parts:
+            continue
+        if parts[1].upper() == 'LABEL':
+            labels[parts[2]] = pc
+            continue
+        pc += 1
+
+    for line in lines:
+        parts = line.strip().split()
+        if not parts:
+            continue
+        mod = parts[0]
+        cmd = parts[1].upper()
+        args = parts[2:]
+
+        if cmd == 'LABEL':
+            continue
+
+        if cmd in ['JUMP', 'JZ', 'JNZ'] and args:
+            args = [labels.get(args[0], 0)]
+
+        opcode = extended_instruction_set.get(cmd, None)
+        if opcode is not None:
+            bytecode.append((opcode, args))
+    return bytecode
+"""
+
+# --- vm/full_vm.py ---
+vm_py = """
+class FullVM:
+    def __init__(self):
+        self.vrma = {}
+        self.stack = []
+        self.running = False
+
+    def execute(self, bytecode):
+        self.running = True
+        pc = 0
+        while pc < len(bytecode) and self.running:
+            opcode, args = bytecode[pc]
+
+            if opcode == 0x10:
+                self.vrma[args[0]] = self._evaluate(args[1:])
+            elif opcode == 0x11:
+                self.stack.append(self.vrma.get(args[0], 0))
+            elif opcode == 0x12:
+                b = self.stack.pop()
+                a = self.stack.pop()
+                self.stack.append(a + b)
+            elif opcode == 0x13:
+                b = self.stack.pop()
+                a = self.stack.pop()
+                self.stack.append(a - b)
+            elif opcode == 0x14:
+                b = self.stack.pop()
+                a = self.stack.pop()
+                self.stack.append(a * b)
+            elif opcode == 0x15:
+                b = self.stack.pop()
+                a = self.stack.pop()
+                self.stack.append(a / b)
+            elif opcode == 0x16:
+                b = self.stack.pop()
+                a = self.stack.pop()
+                self.stack.append(a % b)
+            elif opcode == 0x17:
+                pc = args[0] - 1
+            elif opcode == 0x18:
+                val = self.stack.pop()
+                if val == 0:
+                    pc = args[0] - 1
+            elif opcode == 0x19:
+                val = self.stack.pop()
+                if val != 0:
+                    pc = args[0] - 1
+            elif opcode == 0x1A:
+                val = self.stack.pop()
+                print(val)
+            elif opcode == 0xFF:
+                break
+            pc += 1
+
+    def _evaluate(self, tokens):
+        try:
+            return int(tokens[0]) if tokens else 0
+        except ValueError:
+            return self.vrma.get(tokens[0], 0)
+"""
+
+# Write files
+with open(os.path.join(project_dir, "main.py"), "w") as f:
+    f.write(main_py)
+
+os.makedirs(os.path.join(project_dir, "gui"), exist_ok=True)
+with open(os.path.join(project_dir, "gui", "editor.py"), "w") as f:
+    f.write(editor_py)
+
+os.makedirs(os.path.join(project_dir, "compiler"), exist_ok=True)
+with open(os.path.join(project_dir, "compiler", "compiler.py"), "w") as f:
+    f.write(compiler_py)
+
+os.makedirs(os.path.join(project_dir, "vm"), exist_ok=True)
+with open(os.path.join(project_dir, "vm", "full_vm.py"), "w") as f:
+    f.write(vm_py)
+
+# Zip the project for download
+zip_path = f"{project_dir}.zip"
+with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+    for folder, _, files in os.walk(project_dir):
+        for file in files:
+            full_path = os.path.join(folder, file)
+            rel_path = os.path.relpath(full_path, project_dir)
+            zipf.write(full_path, arcname=rel_path)
+
+zip_path
+

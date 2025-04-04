@@ -387,3 +387,145 @@ script = [
 vm = ModuSynthXVM()
 vm.execute(script)
 
+import sys, json, time, random
+
+# --- Constants and Core Tables ---
+INSTRUCTION_SET = {
+    'OPTIMIZE': 0x01,
+    'INFER': 0x09,
+    'PING': 0x07,
+    'FLOWCMP': 0x05,
+    'SIFT': 0x08,
+    'RELEASE': 0x06,
+    'PAUSE': 0x0B,
+    'END': 0xFF
+}
+
+MODIFIER_SET = {
+    'quick': 'OPTIMIZE',
+    'auto': 'PING',
+    'active': 'FLOWCMP',
+    'soft': 'SIFT',
+    'high_load': 'RELEASE'
+}
+
+# --- Virtual Register Memory Allocation (VRMA) ---
+class VRMA:
+    def __init__(self):
+        self.registers = {}
+        self.counter = 0
+
+    def alloc(self, name):
+        self.registers[name] = {"value": None, "id": self.counter}
+        self.counter += 1
+        return self.registers[name]
+
+    def write(self, name, value):
+        if name in self.registers:
+            self.registers[name]['value'] = value
+
+    def read(self, name):
+        return self.registers[name]['value'] if name in self.registers else None
+
+# --- Garbage Handler (Sifting) ---
+class Sifter:
+    def __init__(self, vrma):
+        self.vrma = vrma
+
+    def collect(self):
+        print("[SIFT] Running garbage collector...")
+        unused = [k for k, v in self.vrma.registers.items() if v['value'] is None]
+        for reg in unused:
+            print(f"  - Discarding unused register: {reg}")
+            del self.vrma.registers[reg]
+
+# --- Ping-Based Error Handling ---
+def ping_check(command):
+    if random.random() < 0.05:  # simulate 5% error chance
+        print("[PING] Error detected in:", command)
+        print("[PING] Auto-correcting...")
+        return False
+    return True
+
+# --- AI Inference Simulation ---
+def simulate_ai_call(payload):
+    print(f"[AI] Inference Engine Processing: {payload}")
+    return {"result": "VACU-aligned output"}
+
+# --- Bytecode Compiler ---
+def compile_script(script_lines):
+    bytecode = []
+    for line in script_lines:
+        if not line.strip(): continue
+        parts = line.strip().split()
+        if len(parts) < 2: continue
+
+        mod = parts[0]
+        cmd = parts[1]
+        args = parts[2:] if len(parts) > 2 else []
+
+        instr = MODIFIER_SET.get(mod, cmd).upper()
+        opcode = INSTRUCTION_SET.get(instr, None)
+
+        if opcode is not None:
+            bytecode.append((opcode, args))
+    return bytecode
+
+# --- Execution Engine ---
+class ModuSynthX_VM:
+    def __init__(self):
+        self.vrma = VRMA()
+        self.sifter = Sifter(self.vrma)
+        self.stack = []
+        self.running = True
+
+    def execute(self, bytecode):
+        pc = 0
+        while pc < len(bytecode) and self.running:
+            opcode, args = bytecode[pc]
+            if opcode == INSTRUCTION_SET['OPTIMIZE']:
+                print("[VM] OPTIMIZE :: Modifying stack layout for performance.")
+            elif opcode == INSTRUCTION_SET['INFER']:
+                result = simulate_ai_call(" ".join(args))
+                self.vrma.write('ai_result', result)
+            elif opcode == INSTRUCTION_SET['PING']:
+                if not ping_check(args): continue
+            elif opcode == INSTRUCTION_SET['FLOWCMP']:
+                print("[VM] FLOWCMP :: Memory compressed.")
+            elif opcode == INSTRUCTION_SET['SIFT']:
+                self.sifter.collect()
+            elif opcode == INSTRUCTION_SET['RELEASE']:
+                print("[VM] RELEASE :: Memory released to subsystems.")
+            elif opcode == INSTRUCTION_SET['PAUSE']:
+                input("[VM] Execution paused. Press Enter to continue.")
+            elif opcode == INSTRUCTION_SET['END']:
+                print("[VM] Program complete.")
+                self.running = False
+            else:
+                print("[VM] Unknown opcode:", opcode)
+            pc += 1
+
+# --- Example ModuSynthX Script ---
+modu_script = [
+    "quick write to_stack payload_1",
+    "auto ping check_status",
+    "active FLOWCMP memblock",
+    "soft SIFT memory",
+    "high_load RELEASE RAM",
+    "quick INFER AI_payload",
+    "auto ping verify_ai",
+    "pause wait",
+    "END"
+]
+
+# --- Compilation + Execution ---
+print("[COMPILER] Compiling ModuSynthX Script...")
+compiled = compile_script(modu_script)
+print("[COMPILER] Compilation Complete. Bytecode:")
+for op in compiled:
+    print(" ", op)
+
+print("\n[VM] Starting Execution...")
+vm = ModuSynthX_VM()
+vm.execute(compiled)
+

@@ -1,0 +1,21 @@
+@ = System Object
+
+% = Virtual Memory Space
+
+$ = User Data Space
+
+:: = Binding operator
+
+.mod = Modifier chaining
+
+> = Execution Redirect
+
+ping. = Error or Meta-reactive logic
+
+sift. = Garbage control
+
+flow. = Execution bandwidth control
+
+auto. = Implicit optimization or inference
+
+cell[x,y] = Manual grid control (optional)
